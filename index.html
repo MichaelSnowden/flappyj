@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            display: grid;
+            place-items: center;
+            background-color: rgb(46, 38, 38);
+        }
+
+        @font-face {
+            font-family: flappyBird;
+            src: url(fonts/FlappyBird.ttf);
+        }
+    </style>
+</head>
+<body>
+
+<script>
+    const sounds = {
+        die: new Audio("audio/die.wav"),
+        hit: new Audio("audio/hit.wav"),
+        point: new Audio("audio/point.wav"),
+        swoosh: new Audio("audio/swoosh.wav"),
+        wing: new Audio("audio/wing.wav"),
+        music: new Audio("audio/zelda.mp3"),
+        rupee: new Audio("audio/rupee.wav"),
+        link: new Audio("audio/link.mp3"),
+    }
+
+    const deathSoundInterval = {
+        start: 29.8,
+        end: 31.5
+    }
+
+    const flapSoundIntervals = [{
+        start: 0.7,
+        end: 1.1,
+    }, {
+        start: 1.1,
+        end: 1.6,
+    }, {
+        start: 1.62,
+        end: 2.1,
+    }, {
+        start: 2.0,
+        end: 2.3,
+    }, {
+        start: 7.45,
+        end: 8.2
+    }];
+
+
+    // need to track this so we can cancel the previous one when a new sound effect is played.
+    let stopLinkSoundTimeout = null;
+
+    function playLinkSoundInterval(interval) {
+        if (stopLinkSoundTimeout !== null) {
+            clearTimeout(stopLinkSoundTimeout);
+        }
+        sounds.link.currentTime = interval.start;
+        const duration = interval.end - interval.start; // seconds
+        stopLinkSoundTimeout = setTimeout(function () {
+            sounds.link.pause();
+        }, duration * 1000);
+        sounds.link.play();
+    }
+
+    function playDeathSound() {
+        playLinkSoundInterval(deathSoundInterval);
+    }
+
+    function playFlapSound(i) {
+        const interval = flapSoundIntervals[i];
+        playLinkSoundInterval(interval);
+    }
+
+    function playRandomFlapSound() {
+        let i = Math.floor(Math.random() * flapSoundIntervals.length);
+        playFlapSound(i);
+    }
+
+    function loadImages(imagesLoaded) {
+        const imageFiles = {
+            background: "sprites/background-night.png",
+            base: "sprites/base.png",
+            james: "sprites/james-head.png",
+            greenPipe: "sprites/pipe-green.png",
+            redPipe: "sprites/pipe-red.png",
+            gameOver: "sprites/gameover.png",
+        };
+
+        for (let i = 0; i < 10; ++i) {
+            imageFiles[i] = `sprites/${i}.png`;
+        }
+
+        let numLoading = Object.keys(imageFiles).length;
+
+        const images = {}
+        for (let key in imageFiles) {
+            const image = document.createElement("img");
+            images[key] = image;
+            image.onload = function () {
+                --numLoading;
+                if (numLoading === 0) {
+                    imagesLoaded(images);
+                }
+            }
+            image.src = imageFiles[key];
+        }
+    }
+
+    // e.g. if the vertical lines of two rectangles ever share space on the vertical axis
+    function lineCollides(l1, l2) {
+        if (l1.y > l2.y) {
+            return lineCollides(l2, l1);
+        }
+        return l2.y < l1.y + l1.h;
+    }
+
+    function rectanglesCollide(r1, r2) {
+        if (r1.x > r2.x) {
+            return rectanglesCollide(r2, r1);
+        }
+        if (r1.x + r1.w < r2.x) {
+            return false;
+        }
+        return lineCollides({
+            y: r1.y,
+            h: r1.h,
+        }, {
+            y: r2.y,
+            h: r2.h
+        });
+    }
+
+    // all positions are measured in terms of pixels
+    let yPosition; // (pixels)
+    let yVelocity; // (pixels per millisecond)
+    const yAcceleration = 0.001; // (pixels per millisecond squared)
+
+    let theta; // going clockwise from right x axis (radians)
+    let thetaVelocity; // angular velocity (radians per millisecond)
+    const thetaAcceleration = Math.PI / 1000000; // angular acceleration (radians per millisecond squared)
+
+    const initialBaseXVelocity = -0.1;
+    let baseXVelocity; // pixels per millisecond
+    const baseXAcceleration = -0.000001; // pixels per millisecond squared
+
+    let playbackRate; // unitless, i.e. 1 = normal speed
+    const playbackRateVelocity = 0.01;
+
+    const canvas = document.createElement("canvas");
+    document.body.appendChild(canvas);
+    const context = canvas.getContext("2d");
+
+    function imagesLoaded(images) {
+        canvas.width = images.background.width;
+        canvas.height = images.background.height;
+
+        const background = images.background;
+        const base = images.base;
+        const james = images.james;
+
+        const pipeSpawnDistance = background.width / 2;
+        const pipeSpawnInterval = pipeSpawnDistance / Math.abs(initialBaseXVelocity);
+
+        const jamesHeight = 0.1 * background.height;
+        const jamesScale = jamesHeight / images.james.height;
+        const jamesWidth = james.width * jamesScale;
+
+        let baseX;
+        const baseWidth = images.base.width - 1;
+        const baseY = background.height - base.height;
+        let score;
+
+        const xPosition = background.width * 0.33; // x position of James
+
+        function resetAngle() {
+            thetaVelocity = 0.0;
+            theta = -Math.PI / 5;
+        }
+
+        function start() {
+            score = 0;
+            baseX = 0.0;
+            baseXVelocity = initialBaseXVelocity;
+            playbackRate = 1.0;
+            state = states.playing;
+            resetAngle();
+            yPosition = 0.5;
+            yVelocity = 0.0;
+            lastStepTime = null;
+            pipeHead = null;
+            pipeTail = null;
+
+            sounds.music.pause();
+            sounds.music.currentTime = 0;
+            sounds.music.loop = true;
+            sounds.music.play();
+            window.requestAnimationFrame(step);
+        }
+
+        let pipeHead;
+        let pipeTail;
+
+        const pipeVerticalSpawnRadius = (background.height - base.height) / 4;
+        const pipeVerticalGap = background.height / 6;
+
+        const states = {
+            welcome: 0,
+            playing: 1,
+            gameOver: 2,
+            restart: 3,
+        }
+
+        let state = states.welcome;
+        let restartTimeout = null;
+
+        function gameOver() {
+            sounds.music.pause();
+            playDeathSound();
+            state = states.gameOver;
+            render();
+            if (restartTimeout !== null) {
+                window.clearTimeout(restartTimeout);
+            }
+            restartTimeout = window.setTimeout(function () {
+                state = states.restart;
+                render();
+            }, 1000);
+        }
+
+        function renderBackground() {
+            context.drawImage(background, 0, 0);
+        }
+
+        function renderStartScreen() {
+            const fontSize = 64;
+            context.font = `${fontSize}px flappyBird`;
+            context.textAlign = "center";
+            context.fillStyle = "#000";
+            context.fillText("Flappy J", canvas.width / 2, canvas.height / 2 - fontSize / 2);
+            context.fillText("Tap to Start", canvas.width / 2, canvas.height / 2 + fontSize / 2);
+        }
+
+        function renderBase() {
+            let widthDrawn = baseX; // will be negative
+            while (widthDrawn < canvas.clientWidth) {
+                context.drawImage(images.base, widthDrawn, canvas.height - base.height);
+                widthDrawn += baseWidth;
+            }
+        }
+
+        function renderJames() {
+            renderSprite(james, xPosition, yPosition, theta, jamesScale);
+        }
+
+        function renderSprite(image, cx, cy, theta, scale) {
+            context.setTransform(scale, 0, 0, scale, cx, cy); // sets scale and origin
+            context.rotate(theta);
+            context.drawImage(image, -image.width / 2, -image.height / 2);
+            context.resetTransform();
+        }
+
+        function renderPipes() {
+            let link = pipeHead;
+            while (link !== null) {
+                [pipe, link] = link;
+                const image = pipe.counted ? images.redPipe : images.greenPipe;
+
+                context.setTransform(1, 0, 0, 1, pipe.x, pipe.y + pipeVerticalGap + image.height / 2); // sets scale and origin
+                context.rotate(0);
+                context.drawImage(image, -image.width / 2, -image.height / 2);
+                context.resetTransform();
+
+                context.setTransform(1, 0, 0, 1, pipe.x, pipe.y - (pipeVerticalGap + image.height / 2)); // sets scale and origin
+                context.rotate(Math.PI);
+                context.drawImage(image, -image.width / 2, -image.height / 2);
+                context.resetTransform();
+            }
+        }
+
+        function renderGameOver() {
+            context.drawImage(images.gameOver, background.width / 2 - images.gameOver.width / 2, images.gameOver.height);
+            context.resetTransform();
+        }
+
+        function renderRestart() {
+            context.font = "64px flappyBird";
+            context.textAlign = "center";
+            context.fillStyle = "#000";
+            context.fillText("Tap to Restart", canvas.width / 2, canvas.height / 2);
+        }
+
+        function renderScore() {
+            const digits = [];
+            let tmp = score;
+            while (tmp > 0) {
+                digits.push(tmp % 10);
+                tmp = Math.floor(tmp / 10);
+            }
+            if (digits.length === 0) {
+                digits.push(0);
+            }
+            let width = 0;
+            for (let digit of digits) {
+                width += images[digit].width;
+            }
+            let x = background.width / 2 - width / 2;
+            for (let i = digits.length - 1; i >= 0; --i) {
+                const digit = digits[i];
+                context.drawImage(images[digit], x, 10);
+                x += images[digit].width;
+            }
+        }
+
+        function render() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            renderBackground();
+            if (state === states.welcome) {
+                renderStartScreen();
+            } else {
+                renderPipes();
+                renderBase();
+                renderJames();
+                if (state === states.playing) {
+                    renderScore();
+                } else {
+                    renderGameOver();
+                    if (state === states.restart) {
+                        renderRestart();
+                    }
+                }
+            }
+        }
+
+        let lastStepTime = null;
+        let lastPipeTime = null;
+
+        function spawnPipe() {
+            const h = background.height - base.height;
+            const x = background.width + images.greenPipe.width;
+            const y = Math.random() * pipeVerticalSpawnRadius * 2 + h / 2.0 - pipeVerticalSpawnRadius;
+            const pipe = {
+                x: x,
+                y: y,
+                counted: false,
+            };
+            const link = [pipe, null];
+            if (pipeHead === null) {
+                console.assert(pipeTail === null);
+                pipeHead = link;
+                pipeTail = pipeHead;
+            } else {
+                if (pipeHead[0].x + images.greenPipe.width <= 0) {
+                    if (pipeTail === pipeHead) {
+                        pipeHead = pipeTail = null;
+                    } else {
+                        pipeHead = pipeHead[1];
+                    }
+                }
+                pipeTail[1] = link;
+                pipeTail = link;
+            }
+        }
+
+        function step(time) {
+            if (state !== states.playing) {
+                return;
+            }
+
+            if (lastStepTime === null) {
+                lastStepTime = time;
+            }
+            const elapsed = time - lastStepTime;
+            lastStepTime = time;
+
+            playbackRate += playbackRateVelocity * elapsed;
+
+            baseXVelocity += baseXAcceleration * elapsed;
+            baseX += baseXVelocity * elapsed;
+            if (baseX + baseWidth < 0) {
+                baseX += baseWidth;
+            }
+
+            yVelocity += yAcceleration * elapsed;
+            yPosition += yVelocity * elapsed;
+
+            thetaVelocity += thetaAcceleration * elapsed;
+            theta = Math.min(Math.PI / 2, theta + thetaVelocity * elapsed);
+
+            if (lastPipeTime === null) {
+                lastPipeTime = time;
+            }
+            if (time - lastPipeTime >= pipeSpawnInterval) {
+                lastPipeTime = time;
+                spawnPipe();
+            }
+
+            const collisionScale = 0.7;
+            const collisionWidth = jamesWidth * collisionScale;
+            const collisionHeight = jamesHeight * collisionScale;
+
+            const jamesRect = {
+                x: xPosition - collisionWidth / 2,
+                y: yPosition - collisionHeight / 2,
+                w: collisionWidth,
+                h: collisionHeight,
+            }
+
+            let link = pipeHead;
+            let pipe = null;
+            while (link !== null) {
+                [pipe, link] = link;
+                pipe.x += baseXVelocity * elapsed;
+            }
+
+            if (yPosition + jamesHeight > background.height - base.height) {
+                return gameOver();
+            }
+
+            link = pipeHead;
+            while (link !== null) {
+                [pipe, link] = link;
+                const topPipeRect = {
+                    x: pipe.x - images.greenPipe.width / 2,
+                    w: images.greenPipe.width,
+                    y: pipe.y - pipeVerticalGap - images.greenPipe.height,
+                    h: images.greenPipe.height
+                };
+
+                if (rectanglesCollide(jamesRect, topPipeRect)) {
+                    return gameOver();
+                }
+
+                const bottomPipeRect = {
+                    ...topPipeRect,
+                    y: pipe.y + pipeVerticalGap,
+                };
+
+                if (rectanglesCollide(jamesRect, bottomPipeRect)) {
+                    return gameOver();
+                }
+            }
+
+            if (pipeHead !== null
+                && !pipeHead[0].counted
+                && xPosition - jamesWidth * collisionScale / 2.0 > pipeHead[0].x + images.greenPipe.width / 2.0) {
+                pipeHead[0].counted = true;
+                ++score;
+                sounds.rupee.play();
+            }
+
+            render();
+            window.requestAnimationFrame(step);
+        }
+
+        function flap() {
+            playRandomFlapSound();
+            resetAngle();
+            yVelocity = -0.32;
+        }
+
+        function tap() {
+            if (state === states.welcome) {
+                start();
+            } else if (state === states.playing) {
+                flap();
+            } else if (state === states.restart) {
+                start();
+            }
+        }
+
+        window.addEventListener("keypress", function (e) {
+            if (e.key === " ") {
+                tap();
+            }
+        });
+        canvas.addEventListener("click", tap);
+
+        render();
+    }
+
+    loadImages(imagesLoaded);
+</script>
+</body>
+</html>
