@@ -354,7 +354,6 @@
         }
 
         function restart() {
-            reset();
             let link = pipes.head;
             let pipe;
             while (link !== null) {
@@ -362,6 +361,7 @@
                 pipe.topImage.remove();
                 pipe.bottomImage.remove();
             }
+            reset();
             images.james.style.opacity = "1.0";
             state = STATES.PLAYING;
             window.requestAnimationFrame(step);
@@ -521,7 +521,7 @@
                 }
 
                 if (!pipe.counted && james.x > pipe.x) {
-                    playAudio(sounds.rupee, false, 0.2);
+                    playAudio(sounds.rupee, false, 0.3);
                     ++score;
                     let tempScore = score;
                     let html = "";
@@ -549,7 +549,7 @@
         function flap() {
             james.theta = JAMES_INITIAL_THETA;
             james.vtheta = 0;
-            james.vy = -0.35;
+            james.vy = Math.min(-0.35, james.vy - 0.1);
             playRandomFlapSound();
         }
 
