@@ -232,13 +232,13 @@
             console.assert(image.height > 0);
         }
 
-        const GRAVITY = 0.001;
-        const JAMES_INITIAL_THETA = -Math.PI / 5;
-        const THETA_ACCELERATION = Math.PI / 1000000;
+        const GRAVITY = 0.0015;
+        const JAMES_INITIAL_THETA = -15 * Math.PI / 180;
+        const THETA_ACCELERATION = 0.2 / 1000 * Math.PI / 180;
         const PIPE_SPAWN_INTERVAL = 1000;
         const BASE_X_VELOCITY = -0.2;
         const PIPE_VERTICAL_GAP = (images.background.height - images.base.height) / 6;
-        const PIPE_SPAWN_RADIUS = (images.background.height - images.base.height - PIPE_VERTICAL_GAP * 2 - 60) / 2;
+        const PIPE_SPAWN_RADIUS = 100;
         const PIPE_INITIAL_X = images.background.width + images.pipe.width / 2;
         const JAMES_HEIGHT = 0.1 * images.background.height;
         const JAMES_SCALE = JAMES_HEIGHT / images.james.height;
@@ -324,7 +324,7 @@
             renderBases();
 
             james.x = images.background.width / 3;
-            james.y = images.background.height / 2;
+            james.y = (images.background.height - images.base.height) / 2;
             james.vy = 0;
             james.theta = JAMES_INITIAL_THETA;
             james.vtheta = 0;
@@ -513,7 +513,7 @@
         function flap() {
             james.theta = JAMES_INITIAL_THETA;
             james.vtheta = 0;
-            james.vy = Math.min(-0.3, james.vy - 0.3);
+            james.vy = -0.35;
             playRandomFlapSound();
         }
 
