@@ -221,7 +221,7 @@
     }
 
     function assetsReady() {
-        centerText.innerHTML = `FlappyJ<br/>Tap to Start`;
+        centerText.innerHTML = `FlappyJ<br/>Tap/Space to Start`;
         document.getElementById("loadingIndicator").remove();
         // sounds.music.loop = true;
         // sounds.link.loop = true;
@@ -235,10 +235,10 @@
         const GRAVITY = 0.0015;
         const JAMES_INITIAL_THETA = -15 * Math.PI / 180;
         const THETA_ACCELERATION = 0.2 / 1000 * Math.PI / 180;
-        const PIPE_SPAWN_INTERVAL = 1000;
+        const PIPE_SPAWN_INTERVAL = 1250;
         const BASE_X_VELOCITY = -0.2;
-        const PIPE_VERTICAL_GAP = (images.background.height - images.base.height) / 6;
-        const PIPE_SPAWN_RADIUS = 100;
+        const PIPE_VERTICAL_GAP = 60;
+        const PIPE_SPAWN_RADIUS = 80;
         const PIPE_INITIAL_X = images.background.width + images.pipe.width / 2;
         const JAMES_HEIGHT = 0.1 * images.background.height;
         const JAMES_SCALE = JAMES_HEIGHT / images.james.height;
@@ -326,7 +326,7 @@
             renderBases();
 
             james.x = images.background.width / 3;
-            james.y = (images.background.height - images.base.height) / 2;
+            james.y = 100;
             james.vy = 0;
             james.theta = JAMES_INITIAL_THETA;
             james.vtheta = 0;
@@ -348,6 +348,7 @@
 
         function start() {
             reset();
+            centerText.innerHTML = `Tap/Space to flap`;
             images.james.style.opacity = "0.0";
             state = STATES.STARTING;
             window.requestAnimationFrame(step);
@@ -426,7 +427,7 @@
             }
             gameOverTimeout = setTimeout(function () {
                 state = STATES.RESTART;
-                centerText.innerHTML = `Game Over<br/>Tap to Restart`;
+                centerText.innerHTML = `Game Over<br/>Tap/Space to Restart`;
             }, 1000);
         }
 
@@ -457,10 +458,15 @@
                 const elapsedSinceStart = time - startTime;
                 if (elapsedSinceStart < STARTUP_TIME) {
                     if (elapsedSinceStart > START_FADE_TIME) {
-                        images.james.style.opacity = `${(elapsedSinceStart - START_FADE_TIME) / (STARTUP_TIME - START_FADE_TIME)}`;
+                        const opacity = (elapsedSinceStart - START_FADE_TIME) / (STARTUP_TIME - START_FADE_TIME);
+                        images.james.style.opacity = `${opacity}`;
+                        centerText.style.opacity = `${1 - opacity}`;
                     }
                     return window.requestAnimationFrame(step);
                 } else {
+                    images.james.style.opacity = "1.0";
+                    centerText.innerHTML = ``;
+                    centerText.style.opacity = "1.0";
                     state = STATES.PLAYING;
                 }
             }
@@ -549,7 +555,7 @@
         function flap() {
             james.theta = JAMES_INITIAL_THETA;
             james.vtheta = 0;
-            james.vy = Math.min(-0.35, james.vy - 0.1);
+            james.vy = Math.min(-0.4, james.vy - 0.3);
             playRandomFlapSound();
         }
 
