@@ -81,6 +81,8 @@
     <div id="centerText">FlappyJ<br/>Tap to Start</div>
 </div>
 <script>
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioContext = new AudioContext();
 
     const numLinkSounds = 5;
 
@@ -115,29 +117,29 @@
         }
     }
 
+    function playAudio(sound) {
+        sound.connect(audioContext.destination);
+        sound.start();
+    }
+
+    function pauseAudio(sound) {
+        sound.disconnect();
+    }
+
     for (let key of Object.keys(sounds)) {
         const src = sounds[key];
-        const audio = new Audio();
-        sounds[key] = audio;
-        let counted = false;
-        audio.addEventListener("canplaythrough", function () {
-            if (counted) {
+        let loaded = false;
+        fetch(src).then(response => response.ArrayBuffer())
+        .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
+        .then(audioBuffer => {
+            if (loaded) {
                 return;
             }
-            counted = true;
+            const bufferSource = audioContext.createBufferSource();
+            bufferSource.buffer = audioBuffer;
+            sounds[key] = bufferSource;
             assetReady();
         });
-        audio.addEventListener("error", function () {
-            alert(`failed to load ${src}`);
-        });
-        audio.src = src;
-        audio.load();
-        if (audio.readyState >= 4) {
-            if (!counted) {
-                counted = true;
-                assetReady();
-            }
-        }
     }
 
     for (let key of Object.keys(images)) {
