@@ -33,9 +33,9 @@
         point: new Audio("audio/point.wav"),
         swoosh: new Audio("audio/swoosh.wav"),
         wing: new Audio("audio/wing.wav"),
-        music: new Audio("audio/zelda.mp3"),
         rupee: new Audio("audio/rupee.wav"),
         link: new Audio("audio/link.mp3"),
+        music: new Audio("audio/zelda.mp3"),
     }
 
     const deathSoundInterval = {
@@ -68,11 +68,15 @@
         if (stopLinkSoundTimeout !== null) {
             clearTimeout(stopLinkSoundTimeout);
         }
-        sounds.link.currentTime = interval.start;
         const duration = interval.end - interval.start; // seconds
+        console.assert(duration > 0);
         stopLinkSoundTimeout = setTimeout(function () {
             sounds.link.pause();
+            stopLinkSoundTimeout = null;
         }, duration * 1000);
+        sounds.link.pause();
+        console.log(`playing from ${interval.start}`);
+        sounds.link.currentTime = interval.start;
         sounds.link.play();
     }
 
@@ -208,7 +212,9 @@
             sounds.music.currentTime = 0;
             sounds.music.loop = true;
             sounds.music.play();
-            window.requestAnimationFrame(step);
+            window.setTimeout(function () {
+                window.requestAnimationFrame(step);
+            }, 1000 / 30);
         }
 
         let pipeHead;
@@ -257,7 +263,7 @@
         function renderBase() {
             let widthDrawn = baseX; // will be negative
             while (widthDrawn < canvas.clientWidth) {
-                context.drawImage(images.base, widthDrawn, canvas.height - base.height);
+                context.drawImage(images.base, widthDrawn, baseY);
                 widthDrawn += baseWidth;
             }
         }
@@ -271,6 +277,10 @@
             context.rotate(theta);
             context.drawImage(image, -image.width / 2, -image.height / 2);
             context.resetTransform();
+            const debug = true;
+            if (debug) {
+                context.strokeRect(cx - image.width * scale / 2, cy - image.height * scale / 2, image.width * scale, image.height * scale);
+            }
         }
 
         function renderPipes() {
@@ -278,16 +288,9 @@
             while (link !== null) {
                 [pipe, link] = link;
                 const image = pipe.counted ? images.redPipe : images.greenPipe;
-
-                context.setTransform(1, 0, 0, 1, pipe.x, pipe.y + pipeVerticalGap + image.height / 2); // sets scale and origin
-                context.rotate(0);
-                context.drawImage(image, -image.width / 2, -image.height / 2);
-                context.resetTransform();
-
-                context.setTransform(1, 0, 0, 1, pipe.x, pipe.y - (pipeVerticalGap + image.height / 2)); // sets scale and origin
-                context.rotate(Math.PI);
-                context.drawImage(image, -image.width / 2, -image.height / 2);
-                context.resetTransform();
+                const dy = pipeVerticalGap + image.height / 2;
+                renderSprite(image, pipe.x, pipe.y + dy, 0, 1);
+                renderSprite(image, pipe.x, pipe.y - dy, Math.PI, 1);
             }
         }
 
@@ -454,12 +457,18 @@
                 }
             }
 
-            if (pipeHead !== null
-                && !pipeHead[0].counted
-                && xPosition - jamesWidth * collisionScale / 2.0 > pipeHead[0].x + images.greenPipe.width / 2.0) {
-                pipeHead[0].counted = true;
-                ++score;
-                sounds.rupee.play();
+            link = pipeHead;
+            while (link != null) {
+                [pipe, link] = link;
+                if (pipe.counted) {
+                    continue;
+                }
+                if (xPosition - jamesWidth * collisionScale / 2.0 > pipe.x + images.greenPipe.width / 2.0) {
+                    pipe.counted = true;
+                    ++score;
+                    sounds.rupee.play();
+                    break;
+                }
             }
 
             render();
@@ -488,6 +497,7 @@
             }
         });
         canvas.addEventListener("click", tap);
+        canvas.addEventListener("touchstart", tap);
 
         render();
     }
