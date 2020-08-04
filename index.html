@@ -73,13 +73,27 @@
             transform: translate(-50%, -50%);
             z-index: 2;
         }
+
+        #container {
+            width: 100%;
+            height: 100%;
+        }
+
+        #loadingIndicator {
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 64px;
+            color: white;
+            font-family: flappyBird;
+        }
     </style>
 </head>
 <body>
 <div id="container">
-    <div id="loadingIndicator"></div>
+    <div id="loadingIndicator">LOADING</div>
     <div id="scoreBoard"></div>
-    <div id="centerText">FlappyJ<br/>Tap to Start</div>
+    <div id="centerText"></div>
 </div>
 <script>
     const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -207,6 +221,7 @@
     }
 
     function assetsReady() {
+        centerText.innerHTML = `FlappyJ<br/>Tap to Start`;
         document.getElementById("loadingIndicator").remove();
         // sounds.music.loop = true;
         // sounds.link.loop = true;
@@ -217,7 +232,7 @@
             console.assert(image.height > 0);
         }
 
-        const GRAVITY = 0.002;
+        const GRAVITY = 0.001;
         const JAMES_INITIAL_THETA = -Math.PI / 5;
         const THETA_ACCELERATION = Math.PI / 1000000;
         const PIPE_SPAWN_INTERVAL = 1000;
