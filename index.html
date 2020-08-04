@@ -77,6 +77,7 @@
 </head>
 <body>
 <div id="container">
+    <div id="loadingIndicator"></div>
     <div id="scoreBoard"></div>
     <div id="centerText">FlappyJ<br/>Tap to Start</div>
 </div>
@@ -84,7 +85,7 @@
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     const audioContext = new AudioContext();
 
-    const numLinkSounds = 5;
+    const numLinkSounds = 4;
 
     const sounds = {
         rupee: "audio/rupee.mp3",
@@ -117,29 +118,47 @@
         }
     }
 
-    function playAudio(sound) {
-        sound.connect(audioContext.destination);
-        sound.start();
+    function playAudio(sound, loop = false, gain = null) {
+        const source = audioContext.createBufferSource();
+        source.loop = loop;
+        source.buffer = sound.buffer;
+
+
+        if (gain !== null) {
+            const gainNode = audioContext.createGain()
+            gainNode.gain.value = gain;
+            gainNode.connect(audioContext.destination);
+            source.connect(gainNode);
+        } else {
+            source.connect(audioContext.destination);
+        }
+        source.start(0);
+        sound.source = source;
     }
 
     function pauseAudio(sound) {
-        sound.disconnect();
+        if (sound.source !== null) {
+            sound.source.stop();
+        }
     }
 
     for (let key of Object.keys(sounds)) {
         const src = sounds[key];
         let loaded = false;
-        fetch(src).then(response => response.ArrayBuffer())
-        .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
-        .then(audioBuffer => {
-            if (loaded) {
-                return;
-            }
-            const bufferSource = audioContext.createBufferSource();
-            bufferSource.buffer = audioBuffer;
-            sounds[key] = bufferSource;
-            assetReady();
-        });
+        fetch(src).then(response => response.arrayBuffer())
+            .then(arrayBuffer => {
+                audioContext.decodeAudioData(arrayBuffer, (audioBuffer) => {
+                    console.log('got audio buffer');
+                    if (loaded) {
+                        return;
+                    }
+                    sounds[key] = {
+                        buffer: audioBuffer,
+                        source: null,
+                    }
+                    assetReady();
+                });
+            });
     }
 
     for (let key of Object.keys(images)) {
@@ -188,8 +207,9 @@
     }
 
     function assetsReady() {
-        sounds.music.loop = true;
-        sounds.link.loop = true;
+        document.getElementById("loadingIndicator").remove();
+        // sounds.music.loop = true;
+        // sounds.link.loop = true;
 
         for (let image of Object.values(images)) {
             console.assert(image.complete);
@@ -197,12 +217,13 @@
             console.assert(image.height > 0);
         }
 
-        const GRAVITY = 0.001;
+        const GRAVITY = 0.002;
         const JAMES_INITIAL_THETA = -Math.PI / 5;
         const THETA_ACCELERATION = Math.PI / 1000000;
         const PIPE_SPAWN_INTERVAL = 1000;
         const BASE_X_VELOCITY = -0.2;
-        const PIPE_SPAWN_RADIUS = images.background.height / 10;
+        const PIPE_VERTICAL_GAP = (images.background.height - images.base.height) / 6;
+        const PIPE_SPAWN_RADIUS = (images.background.height - images.base.height - PIPE_VERTICAL_GAP * 2 - 60) / 2;
         const PIPE_INITIAL_X = images.background.width + images.pipe.width / 2;
         const JAMES_HEIGHT = 0.1 * images.background.height;
         const JAMES_SCALE = JAMES_HEIGHT / images.james.height;
@@ -210,7 +231,6 @@
         const COLLISION_SCALE = 0.7;
         const JAMES_COLLISION_WIDTH = JAMES_WIDTH * COLLISION_SCALE;
         const JAMES_COLLISION_HEIGHT = JAMES_HEIGHT * COLLISION_SCALE;
-        const PIPE_VERTICAL_GAP = (images.background.height - images.base.height) / 4;
         const STATES = {
             LOADING: 0,
             START: 1,
@@ -249,18 +269,18 @@
         }
 
         function playDeathSound() {
-            sounds.death.play();
+            playAudio(sounds.death);
         }
 
         let lastPlayedSound = null;
 
         function playFlapSound(i) {
             if (lastPlayedSound !== null) {
-                lastPlayedSound.pause();
+                pauseAudio(lastPlayedSound);
             }
             lastPlayedSound = sounds[`link${i}`];
             lastPlayedSound.currentTime = 0;
-            lastPlayedSound.play();
+            playAudio(lastPlayedSound);
         }
 
         function playRandomFlapSound() {
@@ -307,9 +327,8 @@
             state = STATES.PLAYING;
             centerText.innerHTML = "";
             sounds.music.currentTime = 0;
-            sounds.music.play();
+            playAudio(sounds.music, true);
             sounds.link.currency = 0;
-            // sounds.link.play();
             window.requestAnimationFrame(step);
         }
 
@@ -363,8 +382,7 @@
         }
 
         function gameOver() {
-            sounds.music.pause();
-            // sounds.link.pause();
+            pauseAudio(sounds.music);
             playDeathSound();
             centerText.innerHTML = `Game Over`;
             state = STATES.GAME_OVER;
@@ -452,9 +470,7 @@
                 }
 
                 if (!pipe.counted && james.x > pipe.x) {
-                    sounds.rupee.pause();
-                    sounds.rupee.currentTime = 0;
-                    sounds.rupee.play();
+                    playAudio(sounds.rupee, false, 0.2);
                     ++score;
                     let tempScore = score;
                     let html = "";
@@ -482,7 +498,7 @@
         function flap() {
             james.theta = JAMES_INITIAL_THETA;
             james.vtheta = 0;
-            james.vy = -0.32;
+            james.vy = Math.min(-0.3, james.vy - 0.3);
             playRandomFlapSound();
         }
 
