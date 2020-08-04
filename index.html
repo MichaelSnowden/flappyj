@@ -74,70 +74,61 @@
             z-index: 2;
         }
     </style>
-
-    <img rel="preload" src="sprites/0.png" style="display: none"/>
-    <img rel="preload" src="sprites/1.png" style="display: none"/>
-    <img rel="preload" src="sprites/2.png" style="display: none"/>
-    <img rel="preload" src="sprites/3.png" style="display: none"/>
-    <img rel="preload" src="sprites/4.png" style="display: none"/>
-    <img rel="preload" src="sprites/5.png" style="display: none"/>
-    <img rel="preload" src="sprites/6.png" style="display: none"/>
-    <img rel="preload" src="sprites/7.png" style="display: none"/>
-    <img rel="preload" src="sprites/8.png" style="display: none"/>
-    <img rel="preload" src="sprites/9.png" style="display: none"/>
 </head>
 <body>
-<audio id="rupee" src="audio/rupee.wav"></audio>
-<audio id="link" src="audio/link.mp3"></audio>
-<audio id="zelda" src="audio/zelda.mp3"></audio>
 <div id="container">
-    <img id="background" src="sprites/background-night.png" style="z-index: 0"/>
-    <img id="james" src="sprites/james-head.png"/>
-    <img id="base" src="sprites/base.png"/>
-    <img id="base2" src="sprites/base.png"/>
-    <img id="pipe" class="pipe" src="sprites/pipe-green.png"/>
     <div id="scoreBoard"></div>
     <div id="text">FlappyJ<br/>Tap to Start</div>
 </div>
 <script>
     const sounds = {
-        rupee: document.getElementById("rupee"),
-        link: document.getElementById("link"),
-        zelda: document.getElementById("zelda"),
+        rupee: "audio/rupee.wav",
+        death: "audio/death.mp3",
+        zelda: "audio/zelda.mp3",
+        link0: "audio/link0.mp3",
+        link1: "audio/link1.mp3",
+        link2: "audio/link2.mp3",
+        link3: "audio/link3.mp3",
+        link4: "audio/link4.mp3",
     };
-
+    const numSounds = Object.keys(sounds).length;
     const images = {
-        background: document.getElementById("background"),
-        james: document.getElementById("james"),
-        base: document.getElementById("base"),
-        base2: document.getElementById("base2"),
-        pipe: document.getElementById("pipe"),
+        background: "sprites/background-night.png",
+        james: "sprites/james-head.png",
+        base: "sprites/base.png",
+        pipe: "sprites/pipe-green.png",
     };
+    const numImages = Object.keys(images).length;
+    let numReady = 0;
+
+    function assetReady() {
+        ++numReady;
+        if (numReady === numSounds + numImages) {
+            assetsReady();
+        }
+    }
+
+    for (let key of Object.keys(sounds)) {
+        const src = sounds[key];
+        const audio = new Audio(src);
+        const eventListener = function () {
+            audio.removeEventListener("canplaythrough", eventListener);
+            assetReady();
+        };
+        audio.addEventListener("canplaythrough", eventListener);
+    }
+
+    for (let key of Object.keys(images)) {
+        const image = new Image();
+        const src = images[key];
+        image.onload = function () {
+            assetReady();
+        };
+        image.src = src;
+    }
 
     const text = document.getElementById("text");
     const scoreBoard = document.getElementById("scoreBoard");
-
-    const deathSoundInterval = {
-        start: 29.8,
-        end: 31.5
-    }
-
-    const flapSoundIntervals = [{
-        start: 0.7,
-        end: 1.1,
-    }, {
-        start: 1.1,
-        end: 1.6,
-    }, {
-        start: 1.62,
-        end: 2.1,
-    }, {
-        start: 2.0,
-        end: 2.3,
-    }, {
-        start: 7.45,
-        end: 8.2
-    }];
 
     // e.g. if the vertical lines of two rectangles ever share space on the vertical axis
     function lineCollides(l1, l2) {
@@ -163,312 +154,318 @@
         });
     }
 
-    const GRAVITY = 0.001;
-    const JAMES_INITIAL_THETA = -Math.PI / 5;
-    const THETA_ACCELERATION = Math.PI / 1000000;
-    const PIPE_SPAWN_INTERVAL = 1000;
-    const BASE_X_VELOCITY = -0.2;
-    const PIPE_SPAWN_RADIUS = images.background.height / 10;
-    const PIPE_INITIAL_X = images.background.width + images.pipe.width / 2;
-    const JAMES_HEIGHT = 0.1 * images.background.height;
-    const JAMES_SCALE = JAMES_HEIGHT / images.james.height;
-    const JAMES_WIDTH = images.james.width * JAMES_SCALE;
-    const COLLISION_SCALE = 0.7;
-    const JAMES_COLLISION_WIDTH = JAMES_WIDTH * COLLISION_SCALE;
-    const JAMES_COLLISION_HEIGHT = JAMES_HEIGHT * COLLISION_SCALE;
-    const PIPE_VERTICAL_GAP = (images.background.height - images.base.height) / 4;
-    const STATES = {
-        START: 0,
-        PLAYING: 1,
-        GAME_OVER: 2,
-        RESTART: 3,
-    }
-    const BASE_WIDTH = images.base.width - 1;
-
-    const james = {};
-    let pipes = {};
-    let lastStepTime;
-    let lastPipeTime;
-    let state = STATES.START;
-    let baseX;
-    let score;
-    let gameOverTimeout = null;
-
-    // need to track this so we can cancel the previous one when a new sound effect is played.
-    let stopLinkSoundTimeout = null;
-
-    function playLinkSoundInterval(interval) {
-        if (stopLinkSoundTimeout !== null) {
-            clearTimeout(stopLinkSoundTimeout);
+    function assetsReady() {
+        const GRAVITY = 0.001;
+        const JAMES_INITIAL_THETA = -Math.PI / 5;
+        const THETA_ACCELERATION = Math.PI / 1000000;
+        const PIPE_SPAWN_INTERVAL = 1000;
+        const BASE_X_VELOCITY = -0.2;
+        const PIPE_SPAWN_RADIUS = images.background.height / 10;
+        const PIPE_INITIAL_X = images.background.width + images.pipe.width / 2;
+        const JAMES_HEIGHT = 0.1 * images.background.height;
+        const JAMES_SCALE = JAMES_HEIGHT / images.james.height;
+        const JAMES_WIDTH = images.james.width * JAMES_SCALE;
+        const COLLISION_SCALE = 0.7;
+        const JAMES_COLLISION_WIDTH = JAMES_WIDTH * COLLISION_SCALE;
+        const JAMES_COLLISION_HEIGHT = JAMES_HEIGHT * COLLISION_SCALE;
+        const PIPE_VERTICAL_GAP = (images.background.height - images.base.height) / 4;
+        const STATES = {
+            LOADING: 0,
+            START: 1,
+            PLAYING: 2,
+            GAME_OVER: 3,
+            RESTART: 4,
         }
-        const duration = interval.end - interval.start; // seconds
-        console.assert(duration > 0);
-        stopLinkSoundTimeout = setTimeout(function () {
+        const BASE_WIDTH = images.base.width - 1;
+
+        const james = {};
+        let pipes = {};
+        let lastStepTime;
+        let lastPipeTime;
+        let state = STATES.START;
+        let baseX;
+        let score;
+        let gameOverTimeout = null;
+
+        // need to track this so we can cancel the previous one when a new sound effect is played.
+        let stopLinkSoundTimeout = null;
+
+        function playLinkSoundInterval(interval) {
+            if (stopLinkSoundTimeout !== null) {
+                clearTimeout(stopLinkSoundTimeout);
+            }
+            const duration = interval.end - interval.start; // seconds
+            console.assert(duration > 0);
+            stopLinkSoundTimeout = setTimeout(function () {
+                sounds.link.pause();
+                stopLinkSoundTimeout = null;
+            }, duration * 1000);
             sounds.link.pause();
-            stopLinkSoundTimeout = null;
-        }, duration * 1000);
-        sounds.link.pause();
-        sounds.link.currentTime = interval.start;
-        sounds.link.play();
-    }
-
-    function playDeathSound() {
-        playLinkSoundInterval(deathSoundInterval);
-    }
-
-    function playFlapSound(i) {
-        const interval = flapSoundIntervals[i];
-        playLinkSoundInterval(interval);
-    }
-
-    function playRandomFlapSound() {
-        let i = Math.floor(Math.random() * flapSoundIntervals.length);
-        playFlapSound(i);
-    }
-
-    const container = document.getElementById("container");
-    container.style.width = `${images.background.width}px`;
-    container.style.height = `${images.background.height}px`;
-
-    function renderBases() {
-        if (baseX + BASE_WIDTH < 0) {
-            baseX += BASE_WIDTH;
+            sounds.link.currentTime = interval.start;
+            sounds.link.play();
         }
-        images.base.style.transform = `translateX(${baseX}px)`;
-        images.base2.style.transform = `translateX(${baseX + BASE_WIDTH}px)`;
-    }
 
-    function start() {
-        score = 0;
-        scoreBoard.style.visibility = "visible";
-        scoreBoard.innerHTML = `<img src="sprites/0.png"/>`;
+        function playDeathSound() {
+            playLinkSoundInterval(deathSoundInterval);
+        }
 
-        baseX = 0;
-        images.base.style.visibility = "visible";
-        images.base2.style.visibility = "visible";
-        images.base.style.bottom = "0";
-        images.base2.style.bottom = "0";
-        renderBases();
+        function playFlapSound(i) {
+            const interval = flapSoundIntervals[i];
+            playLinkSoundInterval(interval);
+        }
 
-        james.x = images.background.width / 3;
-        james.y = images.background.height / 2;
-        james.vy = 0;
-        james.theta = JAMES_INITIAL_THETA;
-        james.vtheta = 0;
-        images.james.style.visibility = "visible";
-        images.james.style.width = `${JAMES_WIDTH}px`;
-        images.james.style.height = `${JAMES_HEIGHT}px`;
-        images.james.style.top = `-${JAMES_HEIGHT / 2}px`;
-        images.james.style.left = `-${JAMES_WIDTH / 2}px`;
-        renderJames();
+        function playRandomFlapSound() {
+            let i = Math.floor(Math.random() * flapSoundIntervals.length);
+            playFlapSound(i);
+        }
 
-        pipes.head = null;
-        pipes.tail = null;
-        lastStepTime = null;
-        lastPipeTime = null;
-        state = STATES.PLAYING;
-        text.innerHTML = "";
-        sounds.zelda.currentTime = 0;
-        sounds.zelda.play();
-        window.requestAnimationFrame(step);
-    }
+        const container = document.getElementById("container");
+        container.style.width = `${images.background.width}px`;
+        container.style.height = `${images.background.height}px`;
 
-    function newPipe(y) {
-        const topImage = images.pipe.cloneNode();
-        topImage.id = "";
-        topImage.style.left = `${-images.pipe.width / 2}px`;
-        topImage.style.top = `${-images.pipe.height / 2}px`;
-        container.appendChild(topImage);
-        const bottomImage = images.pipe.cloneNode();
-        bottomImage.id = "";
-        bottomImage.style.left = `${-images.pipe.width / 2}px`;
-        bottomImage.style.top = `${-images.pipe.height / 2}px`;
-        container.appendChild(bottomImage);
-        const pipe = {
-            x: PIPE_INITIAL_X,
-            y: y,
-            topImage: topImage,
-            bottomImage: bottomImage,
-            counted: false,
-        };
-        renderPipe(pipe);
-        return pipe;
-    }
+        function renderBases() {
+            if (baseX + BASE_WIDTH < 0) {
+                baseX += BASE_WIDTH;
+            }
+            images.base.style.transform = `translateX(${baseX}px)`;
+            images.base2.style.transform = `translateX(${baseX + BASE_WIDTH}px)`;
+        }
 
-    function spawnPipe() {
-        const h = images.background.height - images.base.height;
-        const y = Math.random() * PIPE_SPAWN_RADIUS * 2 + h / 2 - PIPE_SPAWN_RADIUS;
+        function start() {
+            score = 0;
+            scoreBoard.style.visibility = "visible";
+            scoreBoard.innerHTML = `<img src="sprites/0.png"/>`;
 
-        if (pipes.head === null) {
-            pipes.head = pipes.tail = [newPipe(y), null];
-        } else {
-            const pipe = pipes.head[0];
-            if (pipe.x + images.pipe.width / 2 < 0) {
-                pipe.counted = false;
-                pipe.x = PIPE_INITIAL_X;
-                pipe.y = y;
-                if (pipes.head !== pipes.tail) {
-                    pipes.head = pipes.head[1];
-                    pipes.tail[1] = [pipe, null];
+            baseX = 0;
+            images.base.style.visibility = "visible";
+            images.base2.style.visibility = "visible";
+            images.base.style.bottom = "0";
+            images.base2.style.bottom = "0";
+            renderBases();
+
+            james.x = images.background.width / 3;
+            james.y = images.background.height / 2;
+            james.vy = 0;
+            james.theta = JAMES_INITIAL_THETA;
+            james.vtheta = 0;
+            images.james.style.visibility = "visible";
+            images.james.style.width = `${JAMES_WIDTH}px`;
+            images.james.style.height = `${JAMES_HEIGHT}px`;
+            images.james.style.top = `-${JAMES_HEIGHT / 2}px`;
+            images.james.style.left = `-${JAMES_WIDTH / 2}px`;
+            renderJames();
+
+            pipes.head = null;
+            pipes.tail = null;
+            lastStepTime = null;
+            lastPipeTime = null;
+            state = STATES.PLAYING;
+            text.innerHTML = "";
+            sounds.zelda.currentTime = 0;
+            sounds.zelda.play();
+            sounds.link.play();
+            window.requestAnimationFrame(step);
+        }
+
+        function newPipe(y) {
+            const topImage = images.pipe.cloneNode();
+            topImage.id = "";
+            topImage.style.left = `${-images.pipe.width / 2}px`;
+            topImage.style.top = `${-images.pipe.height / 2}px`;
+            container.appendChild(topImage);
+            const bottomImage = images.pipe.cloneNode();
+            bottomImage.id = "";
+            bottomImage.style.left = `${-images.pipe.width / 2}px`;
+            bottomImage.style.top = `${-images.pipe.height / 2}px`;
+            container.appendChild(bottomImage);
+            const pipe = {
+                x: PIPE_INITIAL_X,
+                y: y,
+                topImage: topImage,
+                bottomImage: bottomImage,
+                counted: false,
+            };
+            renderPipe(pipe);
+            return pipe;
+        }
+
+        function spawnPipe() {
+            const h = images.background.height - images.base.height;
+            const y = Math.random() * PIPE_SPAWN_RADIUS * 2 + h / 2 - PIPE_SPAWN_RADIUS;
+
+            if (pipes.head === null) {
+                pipes.head = pipes.tail = [newPipe(y), null];
+            } else {
+                const pipe = pipes.head[0];
+                if (pipe.x + images.pipe.width / 2 < 0) {
+                    pipe.counted = false;
+                    pipe.x = PIPE_INITIAL_X;
+                    pipe.y = y;
+                    if (pipes.head !== pipes.tail) {
+                        pipes.head = pipes.head[1];
+                        pipes.tail[1] = [pipe, null];
+                        pipes.tail = pipes.tail[1];
+                    }
+                } else {
+                    pipes.tail[1] = [newPipe(y), null];
                     pipes.tail = pipes.tail[1];
                 }
-            } else {
-                pipes.tail[1] = [newPipe(y), null];
-                pipes.tail = pipes.tail[1];
             }
         }
-    }
 
-    function gameOver() {
-        sounds.zelda.pause();
-        playDeathSound();
-        text.innerHTML = `Game Over`;
-        state = STATES.GAME_OVER;
-        if (gameOverTimeout !== null) {
-            clearTimeout(gameOverTimeout);
+        function gameOver() {
+            sounds.zelda.pause();
+            playDeathSound();
+            text.innerHTML = `Game Over`;
+            state = STATES.GAME_OVER;
+            if (gameOverTimeout !== null) {
+                clearTimeout(gameOverTimeout);
+            }
+            gameOverTimeout = setTimeout(function () {
+                state = STATES.RESTART;
+                text.innerHTML = `Game Over<br/>Tap to Restart`;
+            }, 1000);
         }
-        gameOverTimeout = setTimeout(function () {
-            state = STATES.RESTART;
-            text.innerHTML = `Game Over<br/>Tap to Restart`;
-        }, 1000);
-    }
 
-    function renderPipe(pipe) {
-        const dy = PIPE_VERTICAL_GAP + images.pipe.height / 2;
-        const topY = pipe.y - dy;
-        const bottomY = pipe.y + dy;
-        pipe.topImage.style.transform = `translate(${pipe.x}px, ${topY}px) rotate(180deg)`;
-        pipe.bottomImage.style.transform = `translate(${pipe.x}px, ${bottomY}px)`;
-    }
+        function renderPipe(pipe) {
+            const dy = PIPE_VERTICAL_GAP + images.pipe.height / 2;
+            const topY = pipe.y - dy;
+            const bottomY = pipe.y + dy;
+            pipe.topImage.style.transform = `translate(${pipe.x}px, ${topY}px) rotate(180deg)`;
+            pipe.bottomImage.style.transform = `translate(${pipe.x}px, ${bottomY}px)`;
+        }
 
-    function renderJames() {
-        images.james.style.transform = `translate(${james.x}px, ${james.y}px) rotate(${james.theta}rad)`;
-    }
+        function renderJames() {
+            images.james.style.transform = `translate(${james.x}px, ${james.y}px) rotate(${james.theta}rad)`;
+        }
 
-    function step(time) {
-        if (lastStepTime === null) {
+        function step(time) {
+            if (lastStepTime === null) {
+                lastStepTime = time;
+            }
+            const elapsed = time - lastStepTime;
             lastStepTime = time;
-        }
-        const elapsed = time - lastStepTime;
-        lastStepTime = time;
 
-        baseX += BASE_X_VELOCITY * elapsed;
-        renderBases();
+            baseX += BASE_X_VELOCITY * elapsed;
+            renderBases();
 
-        james.vy += GRAVITY * elapsed;
-        james.y += james.vy * elapsed;
-        renderJames();
+            james.vy += GRAVITY * elapsed;
+            james.y += james.vy * elapsed;
+            renderJames();
 
-        if (james.y + JAMES_HEIGHT / 2 > images.background.height - images.base.height) {
-            return gameOver();
-        }
-        if (james.y - JAMES_HEIGHT / 2 < 0) {
-            return gameOver();
-        }
-
-        james.vtheta += THETA_ACCELERATION * elapsed;
-        james.theta = Math.min(Math.PI / 2, james.theta + james.vtheta * elapsed);
-
-        const jamesRect = {
-            x: james.x - JAMES_COLLISION_WIDTH / 2,
-            y: james.y - JAMES_COLLISION_HEIGHT / 2,
-            w: JAMES_COLLISION_WIDTH,
-            h: JAMES_COLLISION_HEIGHT,
-        }
-
-        let link = pipes.head;
-        let pipe;
-        while (link !== null) {
-            [pipe, link] = link;
-            pipe.x += BASE_X_VELOCITY * elapsed;
-
-            renderPipe(pipe);
-
-            const topY = pipe.y - PIPE_VERTICAL_GAP - images.pipe.height;
-            const bottomY = pipe.y + PIPE_VERTICAL_GAP;
-
-            const topPipeRect = {
-                x: pipe.x - images.pipe.width / 2,
-                w: images.pipe.width,
-                y: topY,
-                h: images.pipe.height
-            };
-
-            if (rectanglesCollide(jamesRect, topPipeRect)) {
+            if (james.y + JAMES_HEIGHT / 2 > images.background.height - images.base.height) {
+                return gameOver();
+            }
+            if (james.y - JAMES_HEIGHT / 2 < 0) {
                 return gameOver();
             }
 
-            const bottomPipeRect = {
-                ...topPipeRect,
-                y: bottomY,
-            };
+            james.vtheta += THETA_ACCELERATION * elapsed;
+            james.theta = Math.min(Math.PI / 2, james.theta + james.vtheta * elapsed);
 
-            if (rectanglesCollide(jamesRect, bottomPipeRect)) {
-                return gameOver();
+            const jamesRect = {
+                x: james.x - JAMES_COLLISION_WIDTH / 2,
+                y: james.y - JAMES_COLLISION_HEIGHT / 2,
+                w: JAMES_COLLISION_WIDTH,
+                h: JAMES_COLLISION_HEIGHT,
             }
 
-            if (!pipe.counted
-                && james.x - JAMES_WIDTH / 2 > pipe.x + images.pipe.width / 2) {
-                ++score;
-                let tempScore = score;
-                let html = "";
-                while (tempScore > 0) {
-                    const digit = tempScore % 10;
-                    html = `<img src="sprites/${digit}.png"/>` + html;
-                    tempScore = Math.floor(tempScore / 10);
-                }
-                scoreBoard.innerHTML = html;
-                pipe.counted = true;
-            }
-        }
-
-        if (lastPipeTime === null) {
-            lastPipeTime = time;
-        }
-        if (time - lastPipeTime > PIPE_SPAWN_INTERVAL) {
-            spawnPipe();
-            lastPipeTime = time;
-        }
-
-        window.requestAnimationFrame(step);
-    }
-
-    function flap() {
-        playRandomFlapSound();
-        james.theta = JAMES_INITIAL_THETA;
-        james.vtheta = 0;
-        james.vy = -0.32;
-    }
-
-    function tap(e) {
-        if (e !== undefined) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-        if (state === STATES.START) {
-            start();
-        } else if (state === STATES.PLAYING) {
-            flap();
-        } else if (state === STATES.RESTART) {
             let link = pipes.head;
             let pipe;
             while (link !== null) {
                 [pipe, link] = link;
-                pipe.topImage.remove();
-                pipe.bottomImage.remove();
-            }
-            start();
-        }
-        return false;
-    }
+                pipe.x += BASE_X_VELOCITY * elapsed;
 
-    window.addEventListener("keypress", function (e) {
-        if (e.key === " ") {
-            tap();
+                renderPipe(pipe);
+
+                const topY = pipe.y - PIPE_VERTICAL_GAP - images.pipe.height;
+                const bottomY = pipe.y + PIPE_VERTICAL_GAP;
+
+                const topPipeRect = {
+                    x: pipe.x - images.pipe.width / 2,
+                    w: images.pipe.width,
+                    y: topY,
+                    h: images.pipe.height
+                };
+
+                if (rectanglesCollide(jamesRect, topPipeRect)) {
+                    return gameOver();
+                }
+
+                const bottomPipeRect = {
+                    ...topPipeRect,
+                    y: bottomY,
+                };
+
+                if (rectanglesCollide(jamesRect, bottomPipeRect)) {
+                    return gameOver();
+                }
+
+                if (!pipe.counted
+                    && james.x - JAMES_WIDTH / 2 > pipe.x + images.pipe.width / 2) {
+                    ++score;
+                    let tempScore = score;
+                    let html = "";
+                    while (tempScore > 0) {
+                        const digit = tempScore % 10;
+                        html = `<img src="sprites/${digit}.png"/>` + html;
+                        tempScore = Math.floor(tempScore / 10);
+                    }
+                    scoreBoard.innerHTML = html;
+                    pipe.counted = true;
+                }
+            }
+
+            if (lastPipeTime === null) {
+                lastPipeTime = time;
+            }
+            if (time - lastPipeTime > PIPE_SPAWN_INTERVAL) {
+                spawnPipe();
+                lastPipeTime = time;
+            }
+
+            window.requestAnimationFrame(step);
         }
-    });
-    container.addEventListener("click", tap);
-    container.addEventListener("touchstart", tap);
+
+        function flap() {
+            // playRandomFlapSound();
+            james.theta = JAMES_INITIAL_THETA;
+            james.vtheta = 0;
+            james.vy = -0.32;
+        }
+
+        function tap(e) {
+            if (e !== undefined) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            if (state === STATES.LOADING) {
+                // don't do shit
+            } else if (state === STATES.START) {
+                start();
+            } else if (state === STATES.PLAYING) {
+                flap();
+            } else if (state === STATES.RESTART) {
+                let link = pipes.head;
+                let pipe;
+                while (link !== null) {
+                    [pipe, link] = link;
+                    pipe.topImage.remove();
+                    pipe.bottomImage.remove();
+                }
+                start();
+            }
+            return false;
+        }
+
+        window.addEventListener("keypress", function (e) {
+            if (e.key === " ") {
+                tap();
+            }
+        });
+        container.addEventListener("click", tap);
+        container.addEventListener("touchstart", tap);
+    }
 </script>
 </body>
 </html>
