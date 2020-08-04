@@ -36,7 +36,7 @@
             position: absolute;
         }
 
-        #james, #pipe, #base, #base2, #scoreBoard {
+        #james, #pipe, #base1, #base2, #scoreBoard {
             visibility: hidden;
         }
 
@@ -48,11 +48,11 @@
             z-index: 1;
         }
 
-        #base, #base2 {
+        #base1, #base2 {
             z-index: 2;
         }
 
-        #text {
+        #centerText {
             font-family: flappyBird;
             z-index: 100;
             top: 50%;
@@ -78,19 +78,22 @@
 <body>
 <div id="container">
     <div id="scoreBoard"></div>
-    <div id="text">FlappyJ<br/>Tap to Start</div>
+    <div id="centerText">FlappyJ<br/>Tap to Start</div>
 </div>
 <script>
+
+    const numLinkSounds = 5;
+
     const sounds = {
-        rupee: "audio/rupee.wav",
+        rupee: "audio/rupee.mp3",
         death: "audio/death.mp3",
-        zelda: "audio/zelda.mp3",
-        link0: "audio/link0.mp3",
-        link1: "audio/link1.mp3",
-        link2: "audio/link2.mp3",
-        link3: "audio/link3.mp3",
-        link4: "audio/link4.mp3",
+        music: "audio/zelda.mp3",
+        link: "audio/link.mp3",
     };
+    for (let i = 0; i < numLinkSounds; ++i) {
+        sounds[`link${i}`] = `audio/link${i}.mp3`;
+    }
+
     const numSounds = Object.keys(sounds).length;
     const images = {
         background: "sprites/background-night.png",
@@ -98,36 +101,64 @@
         base: "sprites/base.png",
         pipe: "sprites/pipe-green.png",
     };
+    for (let i = 0; i < 10; ++i) {
+        images[`${i}`] = `sprites/${i}.png`;
+    }
     const numImages = Object.keys(images).length;
     let numReady = 0;
+    const numAssets = numSounds + numImages;
 
     function assetReady() {
         ++numReady;
-        if (numReady === numSounds + numImages) {
+        if (numReady === numAssets) {
             assetsReady();
         }
     }
 
     for (let key of Object.keys(sounds)) {
         const src = sounds[key];
-        const audio = new Audio(src);
-        const eventListener = function () {
-            audio.removeEventListener("canplaythrough", eventListener);
+        const audio = new Audio();
+        sounds[key] = audio;
+        let counted = false;
+        audio.addEventListener("canplaythrough", function () {
+            if (counted) {
+                return;
+            }
+            counted = true;
             assetReady();
-        };
-        audio.addEventListener("canplaythrough", eventListener);
+        });
+        audio.addEventListener("error", function () {
+            alert(`failed to load ${src}`);
+        });
+        audio.src = src;
+        audio.load();
+        if (audio.readyState >= 4) {
+            if (!counted) {
+                counted = true;
+                assetReady();
+            }
+        }
     }
 
     for (let key of Object.keys(images)) {
-        const image = new Image();
         const src = images[key];
-        image.onload = function () {
+        const image = document.createElement("img");
+        images[key] = image;
+        let counted = false;
+        image.addEventListener("load", function () {
+            if (counted) {
+                return;
+            }
+            counted = true;
             assetReady();
-        };
+        });
+        image.addEventListener("error", function () {
+            alert(`failed to load ${src}`);
+        })
         image.src = src;
     }
 
-    const text = document.getElementById("text");
+    const centerText = document.getElementById("centerText");
     const scoreBoard = document.getElementById("scoreBoard");
 
     // e.g. if the vertical lines of two rectangles ever share space on the vertical axis
@@ -155,6 +186,15 @@
     }
 
     function assetsReady() {
+        sounds.music.loop = true;
+        sounds.link.loop = true;
+
+        for (let image of Object.values(images)) {
+            console.assert(image.complete);
+            console.assert(image.width > 0);
+            console.assert(image.height > 0);
+        }
+
         const GRAVITY = 0.001;
         const JAMES_INITIAL_THETA = -Math.PI / 5;
         const THETA_ACCELERATION = Math.PI / 1000000;
@@ -187,48 +227,51 @@
         let score;
         let gameOverTimeout = null;
 
-        // need to track this so we can cancel the previous one when a new sound effect is played.
-        let stopLinkSoundTimeout = null;
-
-        function playLinkSoundInterval(interval) {
-            if (stopLinkSoundTimeout !== null) {
-                clearTimeout(stopLinkSoundTimeout);
-            }
-            const duration = interval.end - interval.start; // seconds
-            console.assert(duration > 0);
-            stopLinkSoundTimeout = setTimeout(function () {
-                sounds.link.pause();
-                stopLinkSoundTimeout = null;
-            }, duration * 1000);
-            sounds.link.pause();
-            sounds.link.currentTime = interval.start;
-            sounds.link.play();
-        }
-
-        function playDeathSound() {
-            playLinkSoundInterval(deathSoundInterval);
-        }
-
-        function playFlapSound(i) {
-            const interval = flapSoundIntervals[i];
-            playLinkSoundInterval(interval);
-        }
-
-        function playRandomFlapSound() {
-            let i = Math.floor(Math.random() * flapSoundIntervals.length);
-            playFlapSound(i);
-        }
-
         const container = document.getElementById("container");
         container.style.width = `${images.background.width}px`;
         container.style.height = `${images.background.height}px`;
+        container.appendChild(images.background);
+        images.background.id = "background";
+        container.appendChild(images.james);
+        images.james.id = "james";
+
+        let bases = {
+            base1: document.createElement("img"),
+            base2: document.createElement("img"),
+        };
+        bases.base1.id = "base1";
+        bases.base2.id = "base2";
+        for (let base of Object.values(bases)) {
+            base.src = images.base.src;
+            container.appendChild(base);
+        }
+
+        function playDeathSound() {
+            sounds.death.play();
+        }
+
+        let lastPlayedSound = null;
+
+        function playFlapSound(i) {
+            if (lastPlayedSound !== null) {
+                lastPlayedSound.pause();
+            }
+            lastPlayedSound = sounds[`link${i}`];
+            lastPlayedSound.currentTime = 0;
+            lastPlayedSound.play();
+        }
+
+        function playRandomFlapSound() {
+            let i = Math.floor(Math.random() * numLinkSounds);
+            playFlapSound(i);
+        }
 
         function renderBases() {
             if (baseX + BASE_WIDTH < 0) {
                 baseX += BASE_WIDTH;
             }
-            images.base.style.transform = `translateX(${baseX}px)`;
-            images.base2.style.transform = `translateX(${baseX + BASE_WIDTH}px)`;
+            bases.base1.style.transform = `translateX(${baseX}px)`;
+            bases.base2.style.transform = `translateX(${baseX + BASE_WIDTH}px)`;
         }
 
         function start() {
@@ -237,10 +280,10 @@
             scoreBoard.innerHTML = `<img src="sprites/0.png"/>`;
 
             baseX = 0;
-            images.base.style.visibility = "visible";
-            images.base2.style.visibility = "visible";
-            images.base.style.bottom = "0";
-            images.base2.style.bottom = "0";
+            bases.base1.style.visibility = "visible";
+            bases.base2.style.visibility = "visible";
+            bases.base1.style.bottom = "0";
+            bases.base2.style.bottom = "0";
             renderBases();
 
             james.x = images.background.width / 3;
@@ -260,23 +303,21 @@
             lastStepTime = null;
             lastPipeTime = null;
             state = STATES.PLAYING;
-            text.innerHTML = "";
-            sounds.zelda.currentTime = 0;
-            sounds.zelda.play();
-            sounds.link.play();
+            centerText.innerHTML = "";
+            sounds.music.currentTime = 0;
+            sounds.music.play();
+            sounds.link.currency = 0;
+            // sounds.link.play();
             window.requestAnimationFrame(step);
         }
 
         function newPipe(y) {
-            const topImage = images.pipe.cloneNode();
-            topImage.id = "";
+            const topImage = document.createElement("img");
+            topImage.src = images.pipe.src;
             topImage.style.left = `${-images.pipe.width / 2}px`;
             topImage.style.top = `${-images.pipe.height / 2}px`;
             container.appendChild(topImage);
-            const bottomImage = images.pipe.cloneNode();
-            bottomImage.id = "";
-            bottomImage.style.left = `${-images.pipe.width / 2}px`;
-            bottomImage.style.top = `${-images.pipe.height / 2}px`;
+            const bottomImage = topImage.cloneNode();
             container.appendChild(bottomImage);
             const pipe = {
                 x: PIPE_INITIAL_X,
@@ -294,19 +335,25 @@
             const y = Math.random() * PIPE_SPAWN_RADIUS * 2 + h / 2 - PIPE_SPAWN_RADIUS;
 
             if (pipes.head === null) {
+                // this is the first pipe
                 pipes.head = pipes.tail = [newPipe(y), null];
             } else {
                 const pipe = pipes.head[0];
                 if (pipe.x + images.pipe.width / 2 < 0) {
+                    // the leftmost pipe is out-of-bounds, re-use it
                     pipe.counted = false;
                     pipe.x = PIPE_INITIAL_X;
                     pipe.y = y;
                     if (pipes.head !== pipes.tail) {
+                        // if this was not the only pipe, then we need
+                        // to update the head and tail pointers
                         pipes.head = pipes.head[1];
                         pipes.tail[1] = [pipe, null];
                         pipes.tail = pipes.tail[1];
                     }
                 } else {
+                    // the leftmost pipe is not out-of-bounds, so we
+                    // need to create some new elements
                     pipes.tail[1] = [newPipe(y), null];
                     pipes.tail = pipes.tail[1];
                 }
@@ -314,16 +361,17 @@
         }
 
         function gameOver() {
-            sounds.zelda.pause();
+            sounds.music.pause();
+            // sounds.link.pause();
             playDeathSound();
-            text.innerHTML = `Game Over`;
+            centerText.innerHTML = `Game Over`;
             state = STATES.GAME_OVER;
             if (gameOverTimeout !== null) {
                 clearTimeout(gameOverTimeout);
             }
             gameOverTimeout = setTimeout(function () {
                 state = STATES.RESTART;
-                text.innerHTML = `Game Over<br/>Tap to Restart`;
+                centerText.innerHTML = `Game Over<br/>Tap to Restart`;
             }, 1000);
         }
 
@@ -401,8 +449,10 @@
                     return gameOver();
                 }
 
-                if (!pipe.counted
-                    && james.x - JAMES_WIDTH / 2 > pipe.x + images.pipe.width / 2) {
+                if (!pipe.counted && james.x > pipe.x) {
+                    sounds.rupee.pause();
+                    sounds.rupee.currentTime = 0;
+                    sounds.rupee.play();
                     ++score;
                     let tempScore = score;
                     let html = "";
@@ -428,10 +478,10 @@
         }
 
         function flap() {
-            // playRandomFlapSound();
             james.theta = JAMES_INITIAL_THETA;
             james.vtheta = 0;
             james.vy = -0.32;
+            playRandomFlapSound();
         }
 
         function tap(e) {
