@@ -41,7 +41,7 @@
         }
 
         #james {
-            z-index: 2;
+            z-index: 3;
         }
 
         .pipe {
@@ -248,10 +248,11 @@
         const JAMES_COLLISION_HEIGHT = JAMES_HEIGHT * COLLISION_SCALE;
         const STATES = {
             LOADING: 0,
-            START: 1,
-            PLAYING: 2,
-            GAME_OVER: 3,
-            RESTART: 4,
+            WELCOME: 1,
+            STARTING: 2,
+            PLAYING: 3,
+            GAME_OVER: 4,
+            RESTART: 5,
         }
         const BASE_WIDTH = images.base.width - 1;
 
@@ -259,7 +260,8 @@
         let pipes = {};
         let lastStepTime;
         let lastPipeTime;
-        let state = STATES.START;
+        let startTime;
+        let state = STATES.WELCOME;
         let baseX;
         let score;
         let gameOverTimeout = null;
@@ -311,7 +313,7 @@
             bases.base2.style.transform = `translateX(${baseX + BASE_WIDTH}px)`;
         }
 
-        function start() {
+        function reset() {
             score = 0;
             scoreBoard.style.visibility = "visible";
             scoreBoard.innerHTML = `<img src="sprites/0.png"/>`;
@@ -339,11 +341,29 @@
             pipes.tail = null;
             lastStepTime = null;
             lastPipeTime = null;
-            state = STATES.PLAYING;
+            startTime = null;
             centerText.innerHTML = "";
-            sounds.music.currentTime = 0;
             playAudio(sounds.music, true);
-            sounds.link.currency = 0;
+        }
+
+        function start() {
+            reset();
+            images.james.style.opacity = "0.0";
+            state = STATES.STARTING;
+            window.requestAnimationFrame(step);
+        }
+
+        function restart() {
+            reset();
+            let link = pipes.head;
+            let pipe;
+            while (link !== null) {
+                [pipe, link] = link;
+                pipe.topImage.remove();
+                pipe.bottomImage.remove();
+            }
+            images.james.style.opacity = "1.0";
+            state = STATES.PLAYING;
             window.requestAnimationFrame(step);
         }
 
@@ -428,6 +448,22 @@
             }
             const elapsed = time - lastStepTime;
             lastStepTime = time;
+            if (state === STATES.STARTING) {
+                if (startTime === null) {
+                    startTime = time;
+                }
+                const START_FADE_TIME = 3000;
+                const STARTUP_TIME = 5000;
+                const elapsedSinceStart = time - startTime;
+                if (elapsedSinceStart < STARTUP_TIME) {
+                    if (elapsedSinceStart > START_FADE_TIME) {
+                        images.james.style.opacity = `${(elapsedSinceStart - START_FADE_TIME) / (STARTUP_TIME - START_FADE_TIME)}`;
+                    }
+                    return window.requestAnimationFrame(step);
+                } else {
+                    state = STATES.PLAYING;
+                }
+            }
 
             baseX += BASE_X_VELOCITY * elapsed;
             renderBases();
@@ -524,19 +560,12 @@
             }
             if (state === STATES.LOADING) {
                 // don't do shit
-            } else if (state === STATES.START) {
+            } else if (state === STATES.WELCOME) {
                 start();
             } else if (state === STATES.PLAYING) {
                 flap();
             } else if (state === STATES.RESTART) {
-                let link = pipes.head;
-                let pipe;
-                while (link !== null) {
-                    [pipe, link] = link;
-                    pipe.topImage.remove();
-                    pipe.bottomImage.remove();
-                }
-                start();
+                restart();
             }
             return false;
         }
