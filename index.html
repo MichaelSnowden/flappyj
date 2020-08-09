@@ -223,8 +223,6 @@
     function assetsReady() {
         centerText.innerHTML = `FlappyJ<br/>Tap/Space to Start`;
         document.getElementById("loadingIndicator").remove();
-        // sounds.music.loop = true;
-        // sounds.link.loop = true;
 
         for (let image of Object.values(images)) {
             console.assert(image.complete);
@@ -237,13 +235,13 @@
         const THETA_ACCELERATION = 0.2 / 1000 * Math.PI / 180;
         const PIPE_SPAWN_INTERVAL = 1250;
         const BASE_X_VELOCITY = -0.2;
-        const PIPE_VERTICAL_GAP = 60;
+        const PIPE_VERTICAL_GAP = 70;
         const PIPE_SPAWN_RADIUS = 80;
         const PIPE_INITIAL_X = images.background.width + images.pipe.width / 2;
         const JAMES_HEIGHT = 0.1 * images.background.height;
         const JAMES_SCALE = JAMES_HEIGHT / images.james.height;
         const JAMES_WIDTH = images.james.width * JAMES_SCALE;
-        const COLLISION_SCALE = 0.7;
+        const COLLISION_SCALE = 0.6;
         const JAMES_COLLISION_WIDTH = JAMES_WIDTH * COLLISION_SCALE;
         const JAMES_COLLISION_HEIGHT = JAMES_HEIGHT * COLLISION_SCALE;
         const STATES = {
@@ -348,7 +346,7 @@
 
         function start() {
             reset();
-            centerText.innerHTML = `Tap/Space to flap`;
+            centerText.innerHTML = `Tap/Space to Flap`;
             images.james.style.opacity = "0.0";
             state = STATES.STARTING;
             window.requestAnimationFrame(step);
